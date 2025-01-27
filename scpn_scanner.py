@@ -3,262 +3,208 @@ import sys
 import os
 import random
 import requests
-import concurrent.futures
+import time
 import json
-import hashlib
 from datetime import datetime
-from rich.console import Console
-from rich.progress import Progress
-from rich.panel import Panel
-from rich.table import Table
 from jinja2 import Template
-import plotly.graph_objects as go
-from sklearn.ensemble import IsolationForest
-import telegram
-from telegram.ext import Updater, CommandHandler
+import colorama
+from colorama import Fore, Style
 
-# ------------------- Basic Settings -------------------
-console = Console()
-VULN_SEVERITY = {
-    'critical': {'score': 10, 'color': '#FF0000', 'actions': ['Stop service', 'Isolate system']},
-    'high': {'score': 7, 'color': '#FF69B4', 'actions': ['Emergency update', 'Password rotation']},
-    'medium': {'score': 4, 'color': '#FFD700', 'actions': ['Configuration review', 'Minor update']},
-    'low': {'score': 1, 'color': '#00FF00', 'actions': ['Continuous monitoring']}
-}
-AUTO_FIXES = {
-    'CVE-2023-1234': {
-        'commands': [
-            'apt-get update',
-            'apt-get install package-name --only-upgrade'
-        ],
-        'confirmation': 'service --version | grep 2.4.5'
-    }
-}
-SCENARIOS = {
-    'web_server': ['nmap', 'nikto', 'gobuster'],
-    'network_device': ['nmap', 'snmp-check', 'hydra']
-}
+# تهيئة ألوان التيرمينال
+colorama.init(autoreset=True)
 
-# ------------------- Core Functions -------------------
-def smart_scanner(target):
-    """Intelligent multi-layered scanning"""
-    results = {}
-    
-    # Initial discovery
-    with console.status("[bold green]Performing initial discovery..."):
-        quick_scan = nmap_scan(target, arguments="-T4 -F")
-        results['quick_scan'] = quick_scan
-    
-    # Results analysis for scan planning
-    scan_plan = []
-    if '80/tcp' in quick_scan:
-        scan_plan.extend(['nikto', 'gobuster'])
-    if '445/tcp' in quick_scan:
-        scan_plan.append('smb_scan')
-    
-    # Parallel scanning
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        futures = {executor.submit(globals()[f"scan_{tool}"], target): tool for tool in scan_plan}
-        for future in concurrent.futures.as_completed(futures):
-            tool = futures[future]
-            results[tool] = future.result()
-    
-    return results
-
-def nmap_scan(target, arguments="-sV"):
-    """Advanced nmap scanning"""
-    cmd = f"nmap {arguments} {target}"
-    result = subprocess.run(cmd.split(), capture_output=True, text=True)
-    return parse_nmap(result.stdout)
-
-def parse_nmap(output):
-    """Parse nmap results"""
-    parsed = {'open_ports': [], 'services': {}}
-    for line in output.split('\n'):
-        if '/tcp' in line and 'open' in line:
-            parts = line.split()
-            port = parts[0].split('/')[0]
-            service = parts[2] if len(parts) > 2 else 'unknown'
-            parsed['open_ports'].append(port)
-            parsed['services'][port] = service
-    return parsed
-
-# ------------------- AI & Analytics -------------------
-class RiskAnalyzer:
-    """ML-powered Risk Analyzer"""
+class TerminalScanner:
     def __init__(self):
-        self.model = IsolationForest(n_estimators=100)
-    
-    def train(self, historical_data):
-        """Train model on historical data"""
-        X = self.preprocess(historical_data)
-        self.model.fit(X)
-    
-    def predict(self, scan_data):
-        """Detect anomalies"""
-        X = self.preprocess(scan_data)
-        return self.model.predict(X)
-    
-    def preprocess(self, data):
-        """Data preprocessing"""
-        # ... (Implement data transformation logic)
+        self.report_data = {
+            'vulnerabilities': [],
+            'target': '',
+            'start_time': datetime.now(),
+            'services': []
+        }
+        
+    def display_header(self):
+        header = r"""
+         _____  _____ _____  _   _ 
+        /  ___|/  ___|  ___|| \ | |
+        \ `--. \ `--.| |__  |  \| |
+         `--. \ `--. \  __| | . ` |
+        /\__/ //\__/ / |___ | |\  |
+        \____/ \____/\____/ \_| \_/
+        """
+        print(Fore.CYAN + header)
+        print(Fore.YELLOW + "="*55)
+        print(Fore.GREEN + "Advanced Vulnerability Scanner v2.0")
+        print(Fore.YELLOW + "="*55 + Style.RESET_ALL + "\n")
 
-# ------------------- Auto-Fix System -------------------
-def apply_auto_fix(cve_id):
-    """Apply automatic fixes"""
-    fix = AUTO_FIXES.get(cve_id)
-    if not fix:
-        return {"status": "error", "message": "No known fix available"}
-    
-    results = []
-    for cmd in fix['commands']:
+    def check_tool(self, tool):
         try:
-            result = subprocess.run(cmd.split(), capture_output=True, text=True)
-            results.append({
-                "command": cmd,
-                "output": result.stdout,
-                "error": result.stderr
-            })
-        except Exception as e:
-            return {"status": "error", "message": str(e)}
-    
-    # Verify fix
-    check = subprocess.run(fix['confirmation'].split(), capture_output=True, text=True)
-    if check.returncode == 0:
-        return {"status": "success", "results": results}
-    else:
-        return {"status": "warning", "message": "Fix verification failed"}
+            subprocess.run([tool, "--version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            print(Fore.GREEN + f"[+] {tool.ljust(10)} installed")
+            return True
+        except FileNotFoundError:
+            print(Fore.RED + f"[!] {tool.ljust(10)} not found!")
+            return False
 
-# ------------------- Interactive Reporting -------------------
-def generate_report(data, template_name='advanced_report.html'):
-    """Generate interactive report with visualizations"""
-    template = Template('''
-    <html>
-    <head>
-        <title>SCPN Advanced Report</title>
-        <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-        <style>
-            .vulnerability-card {
-                border: 1px solid {{ severity_color }};
-                border-radius: 8px;
-                padding: 15px;
-                margin: 10px 0;
-            }
-            .collapsible {
-                cursor: pointer;
-                padding: 10px;
-                background-color: #f1f1f1;
-            }
-        </style>
-    </head>
-    <body>
-        <h1>Security Scan Report for {{ target }}</h1>
+    def scan_nmap(self, target):
+        print(Fore.BLUE + "[*] Starting Nmap scan..." + Style.RESET_ALL)
+        try:
+            result = subprocess.run(
+                ["nmap", "-sV", "-T4", "-Pn", target],
+                capture_output=True,
+                text=True,
+                timeout=600
+            )
+            return result.stdout
+        except Exception as e:
+            return f"Scan failed: {str(e)}"
+
+    def scan_sqlmap(self, url):
+        print(Fore.BLUE + "[*] Starting SQLMap scan..." + Style.RESET_ALL)
+        try:
+            result = subprocess.run(
+                ["sqlmap", "-u", url, "--batch", "--level=3", "--risk=3"],
+                capture_output=True,
+                text=True,
+                timeout=300
+            )
+            return result.stdout
+        except Exception as e:
+            return f"Scan failed: {str(e)}"
+
+    def scan_xss(self, url):
+        print(Fore.BLUE + "[*] Testing for XSS vulnerabilities..." + Style.RESET_ALL)
+        payloads = [
+            "<script>alert('XSS1')</script>",
+            "<img src=x onerror=alert('XSS2')>",
+            "%3Cscript%3Ealert('XSS3')%3C/script%3E"
+        ]
         
-        <div id="severityChart"></div>
+        vulnerabilities = []
+        for payload in payloads:
+            try:
+                response = requests.get(f"{url}?input={payload}", timeout=10)
+                if payload in response.text:
+                    vulnerabilities.append(f"XSS detected with payload: {payload}")
+            except Exception as e:
+                return f"Error: {str(e)}"
         
-        {% for vuln in vulnerabilities %}
-        <div class="vulnerability-card">
-            <h3>{{ vuln.title }}</h3>
-            <p>Severity: {{ vuln.severity }}</p>
-            <button onclick="toggleDetails('{{ vuln.id }}')">Show Details</button>
-            <div id="{{ vuln.id }}" style="display:none;">
-                {{ vuln.details }}
-                {% if vuln.fix %}
-                <div class="auto-fix">
-                    <h4>Auto Fix:</h4>
-                    <pre>{{ vuln.fix.commands|join('\n') }}</pre>
-                </div>
+        return vulnerabilities if vulnerabilities else "No XSS vulnerabilities found"
+
+    def cve_lookup(self, service, version):
+        print(Fore.BLUE + "[*] Checking CVE database..." + Style.RESET_ALL)
+        try:
+            url = f"https://services.nvd.nist.gov/rest/json/cves/1.0?keyword={service} {version}"
+            response = requests.get(url, timeout=15)
+            cves = response.json().get('result', {}).get('CVE_Items', [])
+            
+            results = []
+            for cve in cves[:5]:  # عرض أول 5 نتائج فقط
+                cve_id = cve['cve']['CVE_data_meta']['ID']
+                desc = cve['cve']['description']['description_data'][0]['value']
+                severity = cve['impact'].get('baseMetricV2', {}).get('severity', 'UNKNOWN')
+                results.append(f"{cve_id} ({severity}): {desc}")
+            
+            return results if results else "No CVEs found"
+        except Exception as e:
+            return f"CVE lookup failed: {str(e)}"
+
+    def generate_report(self, results):
+        print(Fore.BLUE + "[*] Generating HTML report..." + Style.RESET_ALL)
+        template_str = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Scan Report</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 2em; }
+                h1 { color: #2c3e50; }
+                .vuln { border: 1px solid #ddd; padding: 1em; margin: 1em 0; }
+                .critical { background-color: #ffebee; border-color: #ff5252; }
+                .high { background-color: #fff3e0; border-color: #ff9100; }
+                .medium { background-color: #fffde7; border-color: #ffd600; }
+                pre { background-color: #f5f5f5; padding: 1em; overflow-x: auto; }
+            </style>
+        </head>
+        <body>
+            <h1>Security Scan Report</h1>
+            <p>Generated at: {{ timestamp }}</p>
+            <p>Target: {{ target }}</p>
+            
+            {% for scan in results %}
+            <div class="vuln {% if 'critical' in scan.result|lower %}critical{% elif 'high' in scan.result|lower %}high{% elif 'medium' in scan.result|lower %}medium{% endif %}">
+                <h3>{{ scan.name }}</h3>
+                {% if scan.result is iterable and scan.result is not string %}
+                    <ul>
+                    {% for item in scan.result %}
+                        <li>{{ item }}</li>
+                    {% endfor %}
+                    </ul>
+                {% else %}
+                    <pre>{{ scan.result }}</pre>
                 {% endif %}
             </div>
-        </div>
-        {% endfor %}
+            {% endfor %}
+        </body>
+        </html>
+        """
         
-        <script>
-            function toggleDetails(id) {
-                var element = document.getElementById(id);
-                element.style.display = (element.style.display === 'none') ? 'block' : 'none';
-            }
-            
-            // Visualization
-            var data = [{
-                values: {{ severity_distribution.values }},
-                labels: {{ severity_distribution.labels }},
-                type: 'pie'
-            }];
-            
-            Plotly.newPlot('severityChart', data);
-        </script>
-    </body>
-    </html>
-    ''')
-    
-    # Generate chart data
-    severity_counts = {k: 0 for k in VULN_SEVERITY}
-    for vuln in data['vulnerabilities']:
-        severity_counts[vuln['severity']] += 1
-    
-    # Save report
-    with open(template_name, 'w') as f:
-        f.write(template.render(
-            target=data['target'],
-            vulnerabilities=data['vulnerabilities'],
-            severity_distribution={
-                'values': list(severity_counts.values()),
-                'labels': list(severity_counts.keys())
-            }
-        ))
-    
-    return template_name
-
-# ------------------- Telegram Bot Interface -------------------
-class SecurityBot:
-    """Security Monitoring Bot"""
-    def __init__(self, token):
-        self.updater = Updater(token)
-        self.dispatcher = self.updater.dispatcher
-        self.setup_handlers()
-    
-    def setup_handlers(self):
-        """Command handlers setup"""
-        self.dispatcher.add_handler(CommandHandler('start', self.start))
-        self.dispatcher.add_handler(CommandHandler('scan', self.start_scan))
-    
-    def start(self, update, context):
-        """Start interaction"""
-        context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text="Welcome! I'm Security Scanner Bot. Send /scan to start."
+        report = Template(template_str).render(
+            timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            target=self.report_data['target'],
+            results=results
         )
-    
-    def start_scan(self, update, context):
-        """Initiate scanning process"""
-        context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text="Enter target for scanning (IP/URL):"
-        )
-        self.dispatcher.add_handler(MessageHandler(Filters.text, self.handle_target))
-    
-    def handle_target(self, update, context):
-        """Handle target input"""
-        target = update.message.text
-        report = smart_scanner(target)
         
-        with open('report.html', 'rb') as f:
-            context.bot.send_document(
-                chat_id=update.effective_chat.id,
-                document=f,
-                caption=f"Scan report for {target}"
-            )
+        filename = f"scan_report_{datetime.now().strftime('%Y%m%d_%H%M')}.html"
+        with open(filename, 'w') as f:
+            f.write(report)
+        
+        print(Fore.GREEN + f"[+] Report saved as {filename}" + Style.RESET_ALL)
 
-# ------------------- Main Execution -------------------
+    def main_menu(self):
+        self.display_header()
+        
+        # التحقق من الأدوات المطلوبة
+        required_tools = ['nmap', 'sqlmap', 'curl']
+        for tool in required_tools:
+            if not self.check_tool(tool):
+                print(Fore.RED + "\n[!] Required tools missing. Exiting...")
+                sys.exit(1)
+        
+        # إدخال الهدف
+        target = input(Fore.YELLOW + "\n[?] Enter target IP/URL: " + Style.RESET_ALL)
+        self.report_data['target'] = target
+        
+        # اختيار نوع الفحص
+        print(Fore.CYAN + "\nScan Types:")
+        print("1. Full Network Scan (Nmap)")
+        print("2. Web Application Scan (SQLMap + XSS)")
+        print("3. CVE Lookup")
+        print("4. Comprehensive Scan (All tests)")
+        choice = input(Fore.YELLOW + "\n[?] Select scan type (1-4): " + Style.RESET_ALL)
+        
+        results = []
+        
+        if choice in ['1', '4']:
+            nmap_result = self.scan_nmap(target)
+            results.append({'name': 'Nmap Scan', 'result': nmap_result})
+        
+        if choice in ['2', '4']:
+            sqlmap_result = self.scan_sqlmap(target)
+            xss_result = self.scan_xss(target)
+            results.extend([
+                {'name': 'SQL Injection Scan', 'result': sqlmap_result},
+                {'name': 'XSS Scan', 'result': xss_result}
+            ])
+        
+        if choice in ['3', '4']:
+            service = input(Fore.YELLOW + "[?] Enter service name (e.g., Apache): " + Style.RESET_ALL)
+            version = input(Fore.YELLOW + "[?] Enter service version (e.g., 2.4.49): " + Style.RESET_ALL)
+            cve_result = self.cve_lookup(service, version)
+            results.append({'name': 'CVE Check', 'result': cve_result})
+        
+        self.generate_report(results)
+        print(Fore.GREEN + "\n[+] Scan completed successfully!")
+
 if __name__ == "__main__":
-    # Bot configuration (replace with actual token)
-    bot = SecurityBot("YOUR_TELEGRAM_BOT_TOKEN")
-    bot.updater.start_polling()
-    
-    # CLI interface
-    if len(sys.argv) > 1:
-        target = sys.argv[1]
-        report_data = smart_scanner(target)
-        generate_report(report_data)
-        console.print(f"[bold green]Report generated: report.html[/]")
+    scanner = TerminalScanner()
+    scanner.main_menu()
