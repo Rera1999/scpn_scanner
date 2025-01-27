@@ -1,38 +1,4 @@
 
-import os
-import subprocess
-import sys
-
-def setup_environment():
-    try:
-        # اسم البيئة الافتراضية
-        env_name = "venv"
-
-        # إنشاء بيئة افتراضية
-        if not os.path.exists(env_name):
-            print("[*] Creating virtual environment...")
-            subprocess.check_call([sys.executable, "-m", "venv", env_name])
-        
-        # تفعيل البيئة الافتراضية
-        activate_script = f"./{env_name}/bin/activate"
-        if os.name == "nt":
-            activate_script = f"{env_name}\\Scripts\\activate.bat"
-
-        print("[*] Activating virtual environment...")
-        
-        # تثبيت المكتبات المطلوبة داخل البيئة الافتراضية
-        libraries = ["fpdf", "requests", "jinja2"]
-        print("[*] Installing required libraries...")
-        for lib in libraries:
-            subprocess.check_call([f"./{env_name}/bin/pip", "install", lib])
-        
-        print("[+] All libraries installed successfully!")
-    except Exception as e:
-        print(f"[!] An error occurred: {e}")
-
-if __name__ == "__main__":
-    setup_environment()
-
 # SCPN Vulnerability Scanner
 
 ## 🛠️ Introduction
@@ -67,9 +33,10 @@ if __name__ == "__main__":
    - Incorporates artificial intelligence to enhance vulnerability detection.
    - AI algorithms analyze the scan results to identify possible vulnerabilities.
 
+
 ### 7. **Easy Installation Script**
    - A **Python** installation script that automatically installs all required libraries and tools.
-     
+
 ---
 
 ## 📦 Prerequisites
