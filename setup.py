@@ -39,7 +39,7 @@ def install_dependencies():
         "nmap", "sqlmap"
     ]
     python_packages = [
-        "rich", "requests", "jinja2", "python-telegram-bot"
+        "rich", "requests", "jinja2"
     ]
     
     # التحقق من وجود اتصال بالإنترنت
@@ -53,15 +53,21 @@ def install_dependencies():
     console.print("[*] Updating package repositories...")
     subprocess.run(["sudo", "apt", "update", "-y"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     
-    # تثبيت الأدوات الأساسية
-    for package in packages:
-        console.print(f"[*] Installing package: {package}...")
-        subprocess.run(["sudo", "apt", "install", "-y", package], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    
-    # تثبيت مكتبات بايثون المطلوبة
-    for package in python_packages:
-        console.print(f"[*] Installing Python package: {package}...")
-        subprocess.run([sys.executable, "-m", "pip", "install", package], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    # شريط التقدم للتثبيت الفعلي
+    with Progress() as progress:
+        task = progress.add_task("[cyan]Installing packages...", total=len(packages) + len(python_packages))
+        
+        # تثبيت الأدوات الأساسية
+        for package in packages:
+            console.print(f"[*] Installing package: {package}...")
+            subprocess.run(["sudo", "apt", "install", "-y", package], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            progress.update(task, advance=1)  # تحديث شريط التقدم
+        
+        # تثبيت مكتبات بايثون المطلوبة
+        for package in python_packages:
+            console.print(f"[*] Installing Python package: {package}...")
+            subprocess.run([sys.executable, "-m", "pip", "install", package], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            progress.update(task, advance=1)  # تحديث شريط التقدم
     
     # التأكد من تثبيت الأدوات
     console.print("[*] Verifying installations...")
@@ -73,15 +79,7 @@ def install_dependencies():
 def main():
     display_logo()
     
-    # عرض شريط التقدم عند تنزيل الأدوات
-    with Progress() as progress:
-        task = progress.add_task("[cyan]Downloading and Installing tools...", total=100)
-        
-        # تثبيت الأدوات مع تحديث شريط التقدم
-        for i in range(10):
-            time.sleep(1)  # محاكاة تأخير حقيقي عند تثبيت الأدوات
-            progress.update(task, advance=10)  # تحديث شريط التقدم
-        install_dependencies()
+    install_dependencies()
 
     # بعد التثبيت، عرض اللوجو لمدة 5 ثوانٍ
     console.clear()
