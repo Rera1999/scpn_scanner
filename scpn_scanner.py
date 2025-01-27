@@ -1,210 +1,285 @@
 import subprocess
 import sys
+import time
 import os
 import random
 import requests
-import time
-import json
-from datetime import datetime
+from rich.console import Console
+from rich.progress import Progress
 from jinja2 import Template
-import colorama
-from colorama import Fore, Style
+import shutil
+import platform
+import socket
 
-# تهيئة ألوان التيرمينال
-colorama.init(autoreset=True)
+# إعداد الكونسول
+console = Console()
 
-class TerminalScanner:
-    def __init__(self):
-        self.report_data = {
-            'vulnerabilities': [],
-            'target': '',
-            'start_time': datetime.now(),
-            'services': []
-        }
-        
-    def display_header(self):
-        header = r"""
-         _____  _____ _____  _   _ 
-        /  ___|/  ___|  ___|| \ | |
-        \ `--. \ `--.| |__  |  \| |
-         `--. \ `--. \  __| | . ` |
-        /\__/ //\__/ / |___ | |\  |
-        \____/ \____/\____/ \_| \_/
-        """
-        print(Fore.CYAN + header)
-        print(Fore.YELLOW + "="*55)
-        print(Fore.GREEN + "Advanced Vulnerability Scanner v2.0")
-        print(Fore.YELLOW + "="*55 + Style.RESET_ALL + "\n")
+# قائمة الشعارات (اللوجو)
+LOGOS = [
+    """
+    ██████  ██████   ██████  ███    ██
+    ██       ██   ██ ██    ██ ████   ██
+    ██   ███ ██████  ██    ██ ██ ██  ██
+    ██    ██ ██      ██    ██ ██  ██ ██
+     ██████  ██       ██████  ██   ████
+    """,
+    """
+     _____   _____   _____   _   _
+    /  ___| /  _  \ | ____| | | | |
+    | |     | | | | | |__   | |_| |
+    | |  _  | | | | |  __|  |  _  |
+    | |_| | | |_| | | |___  | | | |
+    \_____/ \_____/ |_____| |_| |_|
+    """,
+    """
+     ██████  ███████  ██████  ██  ███    ██
+    ██       ██      ██       ██  ████   ██
+    ██   ███ █████   ██   ███ ██  ██ ██  ██
+    ██    ██ ██      ██    ██ ██  ██  ██ ██
+     ██████  ███████  ██████  ██  ██   ████
+    """
+]
 
-    def check_tool(self, tool):
-        try:
-            subprocess.run([tool, "--version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            print(Fore.GREEN + f"[+] {tool.ljust(10)} installed")
-            return True
-        except FileNotFoundError:
-            print(Fore.RED + f"[!] {tool.ljust(10)} not found!")
-            return False
+# عرض لوجو عشوائي
+def display_logo():
+    logo = random.choice(LOGOS)
+    console.print(f"[bold cyan]{logo}[/]")
+    console.print("[bold yellow]======================================= [/]")
+    console.print("[bold green]  SCPN Vulnerability Scanner[/]")
+    console.print("[bold yellow]======================================= [/]")
+    
+# التحقق من نوع الهدف
+def detect_target(target):
+    console.print("[*] Detecting target type...")
+    if target.startswith("http"):
+        console.print("[bold green][+] Detected as Website/Application[/]")
+        return "web"
+    else:
+        console.print("[bold green][+] Detected as Router/Server[/]")
+        return "network"
 
-    def scan_nmap(self, target):
-        print(Fore.BLUE + "[*] Starting Nmap scan..." + Style.RESET_ALL)
-        try:
-            result = subprocess.run(
-                ["nmap", "-sV", "-T4", "-Pn", target],
-                capture_output=True,
-                text=True,
-                timeout=600
-            )
-            return result.stdout
-        except Exception as e:
-            return f"Scan failed: {str(e)}"
+# فحص Nmap
+def scan_nmap(target):
+    console.print("[*] Running Nmap Scan...")
+    with Progress() as progress:
+        task = progress.add_task("[cyan]Scanning...", total=100)
+        for _ in range(10):
+            time.sleep(0.5)
+            progress.update(task, advance=10)
+    result = subprocess.run(["nmap", "-sV", "-p-", target], stdout=subprocess.PIPE, text=True)
+    return result.stdout
 
-    def scan_sqlmap(self, url):
-        print(Fore.BLUE + "[*] Starting SQLMap scan..." + Style.RESET_ALL)
-        try:
-            result = subprocess.run(
-                ["sqlmap", "-u", url, "--batch", "--level=3", "--risk=3"],
-                capture_output=True,
-                text=True,
-                timeout=300
-            )
-            return result.stdout
-        except Exception as e:
-            return f"Scan failed: {str(e)}"
+# فحص SQLMap
+def scan_sqlmap(url):
+    console.print("[*] Running SQLMap...")
+    result = subprocess.run(["sqlmap", "-u", url, "--batch", "--dbs"], stdout=subprocess.PIPE, text=True)
+    return result.stdout
 
-    def scan_xss(self, url):
-        print(Fore.BLUE + "[*] Testing for XSS vulnerabilities..." + Style.RESET_ALL)
-        payloads = [
-            "<script>alert('XSS1')</script>",
-            "<img src=x onerror=alert('XSS2')>",
-            "%3Cscript%3Ealert('XSS3')%3C/script%3E"
-        ]
-        
-        vulnerabilities = []
-        for payload in payloads:
-            try:
-                response = requests.get(f"{url}?input={payload}", timeout=10)
-                if payload in response.text:
-                    vulnerabilities.append(f"XSS detected with payload: {payload}")
-            except Exception as e:
-                return f"Error: {str(e)}"
-        
-        return vulnerabilities if vulnerabilities else "No XSS vulnerabilities found"
+# فحص XSS
+def scan_xss(url):
+    console.print("[*] Testing for XSS...")
+    payload = "<script>alert('XSS')</script>"
+    try:
+        response = requests.get(url, params={"input": payload}, timeout=10)
+        if payload in response.text:
+            return f"[!] XSS Vulnerability Found in {url}"
+        else:
+            return "[*] No XSS Vulnerability Found."
+    except requests.exceptions.RequestException as e:
+        return f"[!] Error testing XSS: {e}"
 
-    def cve_lookup(self, service, version):
-        print(Fore.BLUE + "[*] Checking CVE database..." + Style.RESET_ALL)
-        try:
-            url = f"https://services.nvd.nist.gov/rest/json/cves/1.0?keyword={service} {version}"
-            response = requests.get(url, timeout=15)
-            cves = response.json().get('result', {}).get('CVE_Items', [])
-            
-            results = []
-            for cve in cves[:5]:  # عرض أول 5 نتائج فقط
-                cve_id = cve['cve']['CVE_data_meta']['ID']
-                desc = cve['cve']['description']['description_data'][0]['value']
-                severity = cve['impact'].get('baseMetricV2', {}).get('severity', 'UNKNOWN')
-                results.append(f"{cve_id} ({severity}): {desc}")
-            
-            return results if results else "No CVEs found"
-        except Exception as e:
-            return f"CVE lookup failed: {str(e)}"
+# فحص سريع
+def quick_scan(target):
+    console.print("[*] Running Quick Scan...")
+    result = subprocess.run(["nmap", "-p", "80,443", target], stdout=subprocess.PIPE, text=True)
+    return result.stdout
 
-    def generate_report(self, results):
-        print(Fore.BLUE + "[*] Generating HTML report..." + Style.RESET_ALL)
-        template_str = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Scan Report</title>
-            <style>
-                body { font-family: Arial, sans-serif; margin: 2em; }
-                h1 { color: #2c3e50; }
-                .vuln { border: 1px solid #ddd; padding: 1em; margin: 1em 0; }
-                .critical { background-color: #ffebee; border-color: #ff5252; }
-                .high { background-color: #fff3e0; border-color: #ff9100; }
-                .medium { background-color: #fffde7; border-color: #ffd600; }
-                pre { background-color: #f5f5f5; padding: 1em; overflow-x: auto; }
-            </style>
-        </head>
-        <body>
-            <h1>Security Scan Report</h1>
-            <p>Generated at: {{ timestamp }}</p>
-            <p>Target: {{ target }}</p>
-            
-            {% for scan in results %}
-            <div class="vuln {% if 'critical' in scan.result|lower %}critical{% elif 'high' in scan.result|lower %}high{% elif 'medium' in scan.result|lower %}medium{% endif %}">
-                <h3>{{ scan.name }}</h3>
-                {% if scan.result is iterable and scan.result is not string %}
-                    <ul>
-                    {% for item in scan.result %}
-                        <li>{{ item }}</li>
-                    {% endfor %}
-                    </ul>
-                {% else %}
-                    <pre>{{ scan.result }}</pre>
-                {% endif %}
-            </div>
-            {% endfor %}
-        </body>
-        </html>
-        """
-        
-        report = Template(template_str).render(
-            timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            target=self.report_data['target'],
-            results=results
-        )
-        
-        filename = f"scan_report_{datetime.now().strftime('%Y%m%d_%H%M')}.html"
-        with open(filename, 'w') as f:
-            f.write(report)
-        
-        print(Fore.GREEN + f"[+] Report saved as {filename}" + Style.RESET_ALL)
+# تقييم المخاطر باستخدام الذكاء الاصطناعي
+def evaluate_risk(result):
+    if "Vulnerability Found" in result:
+        return "High Risk"
+    elif "No Vulnerability Found" in result:
+        return "Low Risk"
+    else:
+        return "Unknown Risk"
 
-    def main_menu(self):
-        self.display_header()
-        
-        # التحقق من الأدوات المطلوبة
-        required_tools = ['nmap', 'sqlmap', 'curl']
-        for tool in required_tools:
-            if not self.check_tool(tool):
-                print(Fore.RED + "\n[!] Required tools missing. Exiting...")
-                sys.exit(1)
-        
-        # إدخال الهدف
-        target = input(Fore.YELLOW + "\n[?] Enter target IP/URL: " + Style.RESET_ALL)
-        self.report_data['target'] = target
-        
-        # اختيار نوع الفحص
-        print(Fore.CYAN + "\nScan Types:")
-        print("1. Full Network Scan (Nmap)")
-        print("2. Web Application Scan (SQLMap + XSS)")
-        print("3. CVE Lookup")
-        print("4. Comprehensive Scan (All tests)")
-        choice = input(Fore.YELLOW + "\n[?] Select scan type (1-4): " + Style.RESET_ALL)
-        
-        results = []
-        
-        if choice in ['1', '4']:
-            nmap_result = self.scan_nmap(target)
-            results.append({'name': 'Nmap Scan', 'result': nmap_result})
-        
-        if choice in ['2', '4']:
-            sqlmap_result = self.scan_sqlmap(target)
-            xss_result = self.scan_xss(target)
-            results.extend([
-                {'name': 'SQL Injection Scan', 'result': sqlmap_result},
-                {'name': 'XSS Scan', 'result': xss_result}
-            ])
-        
-        if choice in ['3', '4']:
-            service = input(Fore.YELLOW + "[?] Enter service name (e.g., Apache): " + Style.RESET_ALL)
-            version = input(Fore.YELLOW + "[?] Enter service version (e.g., 2.4.49): " + Style.RESET_ALL)
-            cve_result = self.cve_lookup(service, version)
-            results.append({'name': 'CVE Check', 'result': cve_result})
-        
-        self.generate_report(results)
-        print(Fore.GREEN + "\n[+] Scan completed successfully!")
+# توليد التقرير HTML مع تحسين التصميم
+def generate_report(steps, nmap_result, sqlmap_result, xss_result, quick_result):
+    console.print("[*] Generating HTML Report...")
+    
+    # تحديد اللون بناءً على مستوى المخاطر
+    def get_color_for_risk(risk_level):
+        if risk_level == "High Risk":
+            return "#ff4d4d"  # أحمر
+        elif risk_level == "Low Risk":
+            return "#4dff4d"  # أخضر
+        else:
+            return "#f0f0f0"  # رمادي
+
+    # قالب HTML مع تصميم محدث
+    template = """
+    <html>
+    <head>
+        <title>SCPN Vulnerability Report</title>
+        <style>
+            body { font-family: Arial, sans-serif; background-color: #101010; color: #f0f0f0; }
+            h1 { color: #e6e600; text-align: center; }
+            .section { margin-bottom: 20px; padding: 15px; border-radius: 8px; }
+            .section h2 { color: #e6e600; }
+            .result { padding: 10px; border: 1px solid #333; border-radius: 5px; background-color: #222; }
+            .high-risk { background-color: #ff4d4d; color: white; }
+            .low-risk { background-color: #4dff4d; color: black; }
+            .unknown-risk { background-color: #f0f0f0; color: black; }
+            .header { background-color: #101010; color: #e6e600; text-align: center; padding: 20px; border-radius: 8px; }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h1>SCPN Vulnerability Report</h1>
+            <p>Generated on {{ date }}</p>
+        </div>
+        <div class="section">
+            <h2>Quick Scan Results</h2>
+            <div class="result">{{ quick }}</div>
+        </div>
+        <div class="section">
+            <h2>Nmap Scan Results</h2>
+            <div class="result">{{ nmap }}</div>
+        </div>
+        <div class="section">
+            <h2>SQLMap Results</h2>
+            <div class="result {{ sqlmap_risk_class }}">{{ sqlmap }}</div>
+            <p class="result {{ sqlmap_risk_class }}">Risk Level: {{ sqlmap_risk }}</p>
+        </div>
+        <div class="section">
+            <h2>XSS Results</h2>
+            <div class="result {{ xss_risk_class }}">{{ xss }}</div>
+            <p class="result {{ xss_risk_class }}">Risk Level: {{ xss_risk }}</p>
+        </div>
+    </body>
+    </html>
+    """
+    
+    # تقييم المخاطر
+    sqlmap_risk = evaluate_risk(sqlmap_result)
+    xss_risk = evaluate_risk(xss_result)
+    
+    sqlmap_risk_class = 'high-risk' if sqlmap_risk == "High Risk" else 'low-risk' if sqlmap_risk == "Low Risk" else 'unknown-risk'
+    xss_risk_class = 'high-risk' if xss_risk == "High Risk" else 'low-risk' if xss_risk == "Low Risk" else 'unknown-risk'
+    
+    report = Template(template).render(
+        steps=steps, 
+        nmap=nmap_result, 
+        sqlmap=sqlmap_result, 
+        xss=xss_result, 
+        quick=quick_result,
+        sqlmap_risk=sqlmap_risk,
+        xss_risk=xss_risk,
+        sqlmap_risk_class=sqlmap_risk_class,
+        xss_risk_class=xss_risk_class,
+        date="2025-01-27"  # يمكن إضافة التاريخ الفعلي هنا
+    )
+    
+    with open("report.html", "w") as file:
+        file.write(report)
+    console.print("[bold green][+] Report saved as report.html[/]")
+
+# التحقق من وجود أدوات
+def check_tools():
+    tools = ['nmap', 'sqlmap', 'curl', 'git', 'python3']
+    for tool in tools:
+        result = subprocess.run(["which", tool], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if result.returncode != 0:
+            console.print(f"[bold red][!] {tool} not found! Please install it.[/]")
+        else:
+            console.print(f"[bold green][+] {tool} is installed.[/]")
+
+# التحقق من حالة الإنترنت
+def check_internet():
+    try:
+        subprocess.check_call(['ping', '-c', '1', '8.8.8.8'])
+        console.print("[bold green][+] Internet connection is working.[/]")
+    except subprocess.CalledProcessError:
+        console.print("[bold red][!] Internet connection is not available.[/]")
+
+# إضافة التحديثات
+def check_updates():
+    console.print("[*] Checking for updates...")
+    result = subprocess.run(["git", "pull"], stdout=subprocess.PIPE, text=True)
+    console.print(result.stdout)
+
+# إعداد الأدوات
+def setup_tools():
+    console.print("[*] Installing missing tools...")
+    try:
+        subprocess.check_call(["apt-get", "install", "-y", "nmap", "sqlmap", "curl", "git", "python3-pip"])
+        subprocess.check_call(["pip3", "install", "requests", "jinja2", "rich"])
+    except subprocess.CalledProcessError as e:
+        console.print(f"[bold red][!] Error installing tools: {e}[/]")
+    
+# التحقق من حالة النظام
+def check_system():
+    console.print("[*] Checking system info...")
+    system_info = platform.uname()
+    console.print(f"System: {system_info.system}")
+    console.print(f"Node Name: {system_info.node}")
+    console.print(f"Release: {system_info.release}")
+    console.print(f"Version: {system_info.version}")
+    console.print(f"Machine: {system_info.machine}")
+    console.print(f"Processor: {system_info.processor}")
+
+# الدالة الرئيسية
+def main():
+    check_tools()
+    check_internet()
+    check_system()
+    display_logo()
+    console.print("[1] Full Scan (Auto-Detect)")
+    console.print("[2] Website/Application Scan")
+    console.print("[3] Router/Server Scan")
+    console.print("[4] Quick Scan")
+    console.print("[5] Check for Updates")
+    console.print("[6] Install Tools")
+    choice = console.input("\n[bold cyan]Enter your choice:[/] ")
+
+    target = console.input("[bold yellow]Enter the target (IP or URL): [/]").strip()
+    steps = []
+    quick_result = ""
+
+    if choice == "1":
+        target_type = detect_target(target)
+    elif choice == "2":
+        target_type = "web"
+    elif choice == "3":
+        target_type = "network"
+    elif choice == "4":
+        quick_result = quick_scan(target)
+        steps.append({"name": "Quick Scan", "result": "Completed", "details": quick_result})
+        generate_report(steps, "", "", "", quick_result)
+        return
+    elif choice == "5":
+        check_updates()
+        return
+    elif choice == "6":
+        setup_tools()
+        return
+    else:
+        console.print("[bold red][!] Invalid Choice! Exiting...[/]")
+        return
+
+    # Nmap Scan
+    nmap_result = scan_nmap(target)
+    steps.append({"name": "Nmap Scan", "result": "Completed", "details": nmap_result})
+
+    # Conditional Scans for Web Targets
+    sqlmap_result, xss_result = "", ""
+    if target_type == "web":
+        sqlmap_result = scan_sqlmap(target)
+        steps.append({"name": "SQLMap Scan", "result": "Completed", "details": sqlmap_result})
+        xss_result = scan_xss(target)
+        steps.append({"name": "XSS Scan", "result": "Completed", "details": xss_result})
+
+    generate_report(steps, nmap_result, sqlmap_result, xss_result, "")
 
 if __name__ == "__main__":
-    scanner = TerminalScanner()
-    scanner.main_menu()
+    main()
