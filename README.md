@@ -44,7 +44,6 @@
 Before using **SCPN Vulnerability Scanner**, you need to have the following tools installed:
 
 - **Python 3.x** (and `pip` for package management)
-- **Termux** (if you're using Android)
 - **Nmap** (for network scanning)
 - **SQLMap** (for SQL injection testing)
 
