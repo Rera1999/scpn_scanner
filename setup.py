@@ -22,7 +22,7 @@ def display_logo():
 def install_dependencies():
     # قائمة الأدوات التي يجب تثبيتها
     packages = [
-        "python", "python3", "git", "openssh", "curl", "wget", "clang", "make", "nano",
+        "python3", "git", "openssh", "curl", "wget", "clang", "make", "nano",
         "nmap", "sqlmap"
     ]
     python_packages = [
@@ -31,12 +31,12 @@ def install_dependencies():
     
     # تحديث الحزم أولاً
     console.print("[*] Updating package repositories...")
-    subprocess.run(["pkg", "update", "-y"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    subprocess.run(["sudo", "apt", "update", "-y"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     
     # تثبيت الأدوات الأساسية
     for package in packages:
         console.print(f"[*] Installing package: {package}...")
-        subprocess.run(["pkg", "install", "-y", package], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        subprocess.run(["sudo", "apt", "install", "-y", package], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     
     # تثبيت مكتبات بايثون المطلوبة
     for package in python_packages:
