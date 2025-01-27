@@ -1,9 +1,8 @@
 
-
 # SCPN Vulnerability Scanner
 
 ## 🛠️ Introduction
-**SCPN Vulnerability Scanner** is a comprehensive tool designed to detect vulnerabilities in websites, web applications, and router devices. It utilizes powerful tools and techniques such as **Nmap**, **SQLMap**, **XSS** testing, and even **Artificial Intelligence** to enhance vulnerability detection.
+**SCPN Vulnerability Scanner** is a comprehensive scanning tool designed to detect vulnerabilities in websites, applications, and router devices. The tool scans and analyzes targets using various tools and techniques like **Nmap**, **SQLMap**, and **XSS** testing. Additionally, the tool supports **Artificial Intelligence** to enhance the scanning and analysis process.
 
 ---
 
@@ -11,45 +10,41 @@
 
 ### 1. **Multi-target Scanning**
    - Supports scanning websites, web applications, and router devices.
-   - Automatically detects the target type (website, application, router/server) based on the provided URL/IP.
+   - Auto-detects the target type (website, application, router/server) based on the input URL/IP.
 
 ### 2. **Integrated Scanning Tools**
-   - **Nmap**: A powerful tool for network scanning and port analysis.
-   - **SQLMap**: A tool for detecting and exploiting SQL injection vulnerabilities in databases.
-   - **XSS**: A tool to test websites for **Cross-Site Scripting (XSS)** vulnerabilities.
+   - **Nmap**: Network scanning and port analysis.
+   - **SQLMap**: SQL injection testing for databases.
+   - **XSS**: Testing websites for **Cross-Site Scripting (XSS)** vulnerabilities.
 
 ### 3. **Beautiful HTML Report**
-   - After scanning, the tool generates a visually appealing **HTML** report summarizing the findings.
-   - The report includes results from **Nmap**, **SQLMap**, and **XSS** tests.
+   - Generates an attractive **HTML** report with the scanning results.
+   - Includes detailed information about **Nmap**, **SQLMap**, and **XSS** results.
 
 ### 4. **Graphical Terminal Interface**
-   - Uses the **Rich** library to enhance the user interface with progress bars, beautiful text formatting, and clear outputs during the scanning process.
-   - User-friendly terminal experience.
+   - Uses **Rich** library for a user-friendly terminal interface.
+   - Displays progress bars, beautiful output, and stylish text formatting during the scanning process.
 
 ### 5. **Auto-detection**
-   - Automatically detects whether the input is a website, application, or router.
-   - Selects appropriate scanning methods based on the target type.
+   - Automatically detects whether the target is a website, application, or router.
+   - Provides appropriate scanning methods based on the detected target type.
 
 ### 6. **AI-Enhanced Scanning**
-   - Incorporates Artificial Intelligence algorithms that analyze scan results to enhance vulnerability detection.
-   - AI helps identify potential vulnerabilities by analyzing patterns and anomalies in the scan data.
+   - Incorporates artificial intelligence to enhance vulnerability detection.
+   - AI algorithms analyze the scan results to identify possible vulnerabilities.
 
-### 7. **Hidden Remote Access (Optional)**
-   - **Telegram Bot** integration for remote interaction with the scanner.
-   - Enables command execution remotely on the scanner tool through Telegram, ideal for ethical penetration testing purposes.
-
-### 8. **Easy Installation Script**
-   - Provides a Python-based installation script that automates the setup of all required tools and libraries.
-   - Supports installation in **Termux** or other environments.
+### 7. **Easy Installation Script**
+   - A **Python** installation script that automatically installs all required libraries and tools.
+   - Designed for ease of use with **Termux** or other environments.
 
 ---
 
 ## 📦 Prerequisites
 
-Before using **SCPN Vulnerability Scanner**, make sure you have the following installed:
+Before using **SCPN Vulnerability Scanner**, you need to have the following tools installed:
 
-- **Python 3.x** (with `pip` for package management)
-- **Termux** (if using on Android)
+- **Python 3.x** (and `pip` for package management)
+- **Termux** (if you're using Android)
 - **Nmap** (for network scanning)
 - **SQLMap** (for SQL injection testing)
 
@@ -57,53 +52,48 @@ Before using **SCPN Vulnerability Scanner**, make sure you have the following in
 
 ## ⚙️ Installation
 
-To install all necessary dependencies and tools, follow these steps:
+You can easily install all the necessary dependencies and tools using the provided script:
 
 1. Clone the repository:
    ```bash
    git clone https://github.com/your-username/scpn-scanner.git
    cd scpn-scanner
+   ```
 
 2. Make the installation script executable:
-
-chmod +x setup.py
-
+   ```bash
+   chmod +x setup.py
+   ```
 
 3. Run the installation script:
+   ```bash
+   python3 setup.py
+   ```
 
-python3 setup.py
-
-
-
-This script will automatically install Nmap, SQLMap, and all the required Python libraries.
-
+This script will automatically install all required tools and libraries, including **Nmap**, **SQLMap**, and the necessary Python packages.
 
 ---
 
-🚀 Usage
+## 🚀 Usage
 
-1. After installation, run the SCPN Vulnerability Scanner:
+1. After the installation, run the **SCPN Vulnerability Scanner**:
+   ```bash
+   python3 scpn_scanner.py
+   ```
 
-python3 scpn_scanner.py
+2. You will be prompted to enter the target (IP or URL). Depending on the input, the tool will auto-detect the target type (website, application, or router).
 
+3. The scanning process will begin, and you will see progress bars and stylish output in the terminal.
 
-2. You will be prompted to enter a target (IP or URL). The tool will auto-detect the type of target (website, application, or router) based on your input.
-
-
-3. The scanning process will start, and you will see progress bars and stylish output in the terminal.
-
-
-4. After the scan finishes, the tool will generate a detailed HTML report with the results.
-
-
-
+4. After the scan is complete, an **HTML report** will be generated with the results.
 
 ---
 
-📊 Example Output
+## 📊 Example Output
 
-Here’s an example of how the HTML report will look:
+Here’s an example of what the HTML report will look like:
 
+```html
 <html>
 <head>
     <title>SCPN Vulnerability Report</title>
@@ -131,26 +121,21 @@ Here’s an example of how the HTML report will look:
     </div>
 </body>
 </html>
-
-
----
-
-📝 Notes
-
-This tool is designed for ethical penetration testing and vulnerability assessment only.
-
-Always obtain proper authorization before scanning any website or network.
-
-Use responsibly and ensure compliance with all relevant laws and regulations.
-
-
+```
 
 ---
 
-📢 Contact
+## 📝 Notes
 
-If you have any questions, suggestions, or improvements, feel free to contact us:
+- The tool is intended for ethical penetration testing and vulnerability assessment.
+- Always get proper authorization before scanning any website or network.
+- Use responsibly and in compliance with all relevant laws and regulations.
 
-Email: rera1999.rera@gmail.com
+---
 
-Telegram: @vvsks
+## 📢 Contact
+
+For any questions, suggestions, or improvements, feel free to contact us:
+
+- **Email**: [rera1999.rera@gmail.com](mailto:rera1999.rera@gmail.com)
+- **Telegram**: [@vvsks](https://t.me/vvsks)
