@@ -35,8 +35,7 @@
 
 ### 7. **Easy Installation Script**
    - A **Python** installation script that automatically installs all required libraries and tools.
-   - Designed for ease of use with **Termux** or other environments.
-
+     
 ---
 
 ## 📦 Prerequisites
