@@ -1,162 +1,231 @@
-import subprocess
-import sys
+#!/usr/bin/env python3
 import os
-import requests
+import sys
+import time
+import subprocess
+import socket
+import argparse
+import threading
+from queue import Queue
 from datetime import datetime
-from jinja2 import Template
 
-# Terminal colors
-class colors:
-    RED = '\033[91m'
-    GREEN = '\033[92m'
-    YELLOW = '\033[93m'
-    CYAN = '\033[96m'
-    RESET = '\033[0m'
+# Configuration
+VERSION = "3.0"
+REPO_URL = "https://github.com/yourusername/scpn-scanner.git"
+DEFAULT_PORTS = "21,22,80,443,3306,8080"
+THREADS = 50
+TIMEOUT = 2
+LOG_FILE = "scan_log.txt"
 
-# Required tools for advanced scanning
-REQUIRED_TOOLS = {
-    'nmap': 'Network exploration and security auditing',
-    'gobuster': 'Directory/file & DNS busting tool',
-    'sslscan': 'SSL/TLS scanner',
-    'whois': 'Domain information lookup',
-    'dig': 'DNS analysis tool',
-    'nikto': 'Web server vulnerability scanner',
-    'sqlmap': 'SQL injection automation tool',
-    'dnsenum': 'DNS enumeration tool',
-    'whatweb': 'Web application fingerprinting'
-}
+class NetworkScanner:
+    def __init__(self):
+        self.queue = Queue()
+        self.open_ports = []
+        self.lock = threading.Lock()
 
-def print_banner():
-    print(f"""{colors.CYAN}
-    ███████╗ █████╗ ██████╗ ██╗   ██╗███████╗██████╗ 
-    ██╔════╝██╔══██╗██╔══██╗██║   ██║██╔════╝██╔══██╗
-    █████╗  ███████║██████╔╝██║   ██║█████╗  ██████╔╝
-    ██╔══╝  ██╔══██║██╔═══╝ ██║   ██║██╔══╝  ██╔═══╝ 
-    ██║     ██║  ██║██║     ╚██████╔╝███████╗██║     
-    ╚═╝     ╚═╝  ╚═╝╚═╝      ╚═════╝ ╚══════╝╚═╝     
-    {colors.RESET}""")
-    print(f"{colors.YELLOW}Advanced Network and Web Scanner v4.0{colors.RESET}\n")
+    def validate_target(self, target):
+        try:
+            socket.gethostbyname(target)
+            return True
+        except socket.error:
+            return False
 
-def check_tools():
-    missing = []
-    for tool, desc in REQUIRED_TOOLS.items():
-        if not shutil.which(tool):
-            missing.append(tool)
-    return missing
+    def port_scan(self, target, port):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(TIMEOUT)
+                result = s.connect_ex((target, port))
+                if result == 0:
+                    with self.lock:
+                        self.open_ports.append(port)
+        except Exception as e:
+            self.log_error(f"Port scan error: {str(e)}")
 
-def run_command(cmd, timeout=300):
-    try:
-        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=timeout)
-        return result.stdout.strip()
-    except subprocess.TimeoutExpired:
-        return f"{colors.RED}[!] Command timed out: {' '.join(cmd)}{colors.RESET}"
-    except Exception as e:
-        return f"{colors.RED}[!] Error: {str(e)}{colors.RESET}"
+    def start_workers(self, target):
+        for _ in range(THREADS):
+            t = threading.Thread(target=self.worker, args=(target,))
+            t.daemon = True
+            t.start()
 
-# Advanced IP or Server Scanning
-def analyze_ip(ip):
-    print(f"{colors.CYAN}[*] Starting IP analysis: {ip}{colors.RESET}")
-    results = {
-        'nmap': run_command(["nmap", "-sV", "-A", "-T4", ip]),
-        'sslscan': run_command(["sslscan", ip]),
-        'whois': run_command(["whois", ip])
-    }
-    generate_report(ip, "IP Analysis", results)
+    def worker(self, target):
+        while True:
+            port = self.queue.get()
+            self.port_scan(target, port)
+            self.queue.task_done()
 
-# Web Application Scanning
-def analyze_website(url):
-    print(f"{colors.CYAN}[*] Starting web application scan on {url}{colors.RESET}")
-    results = {
-        'gobuster': run_command(["gobuster", "dir", "-u", url, "-w", "/usr/share/wordlists/dirb/common.txt"]),
-        'nikto': run_command(["nikto", "-h", url]),
-        'sqlmap': run_command(["sqlmap", "-u", url, "--batch", "--level=3"]),
-        'whatweb': run_command(["whatweb", url])
-    }
-    generate_report(url, "Web Application Analysis", results)
+    def quick_scan(self, target):
+        if not self.validate_target(target):
+            return None
+            
+        start_time = time.time()
+        ports = [int(p) for p in DEFAULT_PORTS.split(",")]
+        
+        for port in ports:
+            self.queue.put(port)
+            
+        self.queue.join()
+        return {
+            "target": target,
+            "ports": sorted(self.open_ports),
+            "duration": time.time() - start_time
+        }
 
-# DNS Analysis
-def analyze_dns(domain):
-    print(f"{colors.CYAN}[*] Starting DNS analysis for {domain}{colors.RESET}")
-    results = {
-        'dig': run_command(["dig", domain]),
-        'dnsenum': run_command(["dnsenum", domain]),
-        'whois': run_command(["whois", domain])
-    }
-    generate_report(domain, "DNS Analysis", results)
+    def full_scan(self, target):
+        if not self.validate_target(target):
+            return None
 
-# Report Generation
-def generate_report(target, scan_type, results):
-    template = """
-    <html>
-    <head>
-        <title>Security Scan Report</title>
-        <style>
-            body { font-family: Arial, sans-serif; margin: 2em; background: #1a1a1a; color: #fff; }
-            h1, h2 { color: #4CAF50; }
-            .card { background: #2d2d2d; padding: 1em; margin: 1em 0; border-radius: 5px; }
-            pre { background: #000; padding: 1em; overflow-x: auto; }
-        </style>
-    </head>
-    <body>
-        <h1>Security Scan Report</h1>
-        <h2>Scan Type: {{ scan_type }}</h2>
-        <h3>Target: {{ target }}</h3>
-        <p>Generated: {{ timestamp }}</p>
+        try:
+            # Nmap TCP SYN Scan (requires root)
+            nmap_result = subprocess.run(
+                ["sudo", "nmap", "-sS", "-sV", "-O", "-p-", "-T4", target],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=600
+            )
+            
+            # Web directory brute force
+            gobuster_result = subprocess.run(
+                ["gobuster", "dir", "-u", f"http://{target}", "-w", 
+                 "/usr/share/wordlists/dirb/common.txt"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=300
+            )
+            
+            return {
+                "nmap": nmap_result.stdout,
+                "gobuster": gobuster_result.stdout
+            }
+            
+        except subprocess.TimeoutExpired:
+            self.log_error("Full scan timed out")
+            return None
 
-        {% for section, data in results.items() %}
-        <div class="card">
-            <h2>{{ section|upper }}</h2>
-            <pre>{{ data }}</pre>
-        </div>
-        {% endfor %}
-    </body>
-    </html>
-    """
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    report = Template(template).render(scan_type=scan_type, target=target, results=results, timestamp=timestamp)
-    filename = f"scan_report_{target.replace('.', '_')}.html"
-    with open(filename, 'w') as f:
-        f.write(report)
-    print(f"{colors.GREEN}[+] Report generated: {filename}{colors.RESET}")
+    def vulnerability_scan(self, target):
+        try:
+            vuln_checks = [
+                ("nmap_vuln", ["nmap", "--script", "vuln", "-Pn", target]),
+                ("nikto", ["nikto", "-h", target]),
+                ("ssl_scan", ["testssl.sh", target])
+            ]
+            
+            results = {}
+            for name, cmd in vuln_checks:
+                result = subprocess.run(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    timeout=300
+                )
+                results[name] = result.stdout
+                
+            return results
+            
+        except FileNotFoundError as e:
+            self.log_error(f"Tool not found: {str(e)}")
+            return None
 
-# Main Menu
+    def log_error(self, message):
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open(LOG_FILE, "a") as f:
+            f.write(f"[{timestamp}] ERROR: {message}\n")
+
+    def generate_report(self, data, scan_type):
+        filename = f"scan_{scan_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        with open(filename, "w") as f:
+            f.write(f"SCPN Scan Report\n")
+            f.write(f"Scan Type: {scan_type}\n")
+            f.write(f"Date: {datetime.now()}\n\n")
+            
+            if scan_type == "quick":
+                f.write(f"Target: {data['target']}\n")
+                f.write(f"Open Ports: {', '.join(map(str, data['ports']))}\n")
+                f.write(f"Scan Duration: {data['duration']:.2f} seconds\n")
+                
+            elif scan_type == "full":
+                f.write("Nmap Results:\n")
+                f.write(data.get('nmap', 'No data') + "\n\n")
+                f.write("Gobuster Results:\n")
+                f.write(data.get('gobuster', 'No data') + "\n")
+                
+            elif scan_type == "vuln":
+                for tool, result in data.items():
+                    f.write(f"{tool.upper()} Results:\n")
+                    f.write(result + "\n\n")
+                    
+        return filename
+
+    def update_tool(self):
+        try:
+            result = subprocess.run(
+                ["git", "pull", REPO_URL],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=60
+            )
+            
+            if result.returncode == 0:
+                print("Update successful!")
+                print(result.stdout)
+            else:
+                print("Update failed:")
+                print(result.stderr)
+                
+        except subprocess.TimeoutExpired:
+            self.log_error("Update process timed out")
+            print("Update timed out - check internet connection")
+
 def main():
-    print_banner()
-    missing_tools = check_tools()
-    if missing_tools:
-        print(f"{colors.RED}[!] Missing tools: {', '.join(missing_tools)}{colors.RESET}")
-        choice = input("Install missing tools? (y/n): ").lower()
-        if choice == 'y':
-            os.system("sudo apt-get install -y " + " ".join(missing_tools))
+    parser = argparse.ArgumentParser(description="SCPN Advanced Network Scanner")
+    parser.add_argument("target", help="Target IP/hostname to scan")
+    parser.add_argument("-q", "--quick", action="store_true", help="Perform quick port scan")
+    parser.add_argument("-f", "--full", action="store_true", help="Perform comprehensive scan")
+    parser.add_argument("-v", "--vuln", action="store_true", help="Perform vulnerability assessment")
+    parser.add_argument("-u", "--update", action="store_true", help="Update the tool")
+    args = parser.parse_args()
 
-    while True:
-        print("\n" + "="*50)
-        print(f"{colors.YELLOW}Main Menu{colors.RESET}")
-        print("1. IP/Server Analysis")
-        print("2. Web Application Analysis")
-        print("3. DNS Analysis")
-        print("4. Exit")
+    scanner = NetworkScanner()
+    
+    if args.update:
+        scanner.update_tool()
+        return
 
-        choice = input("\n[?] Select option: ")
+    if not scanner.validate_target(args.target):
+        print("Invalid target specified")
+        sys.exit(1)
 
-        if choice == "1":
-            ip = input("[?] Enter target IP: ")
-            analyze_ip(ip)
-        elif choice == "2":
-            url = input("[?] Enter target URL: ")
-            analyze_website(url)
-        elif choice == "3":
-            domain = input("[?] Enter target domain: ")
-            analyze_dns(domain)
-        elif choice == "4":
-            print(f"{colors.GREEN}[+] Exiting...{colors.RESET}")
-            break
-        else:
-            print(f"{colors.RED}[!] Invalid choice{colors.RESET}")
+    if args.quick:
+        print(f"Starting quick scan on {args.target}...")
+        results = scanner.quick_scan(args.target)
+        if results:
+            report_file = scanner.generate_report(results, "quick")
+            print(f"Scan completed. Report saved to {report_file}")
+            
+    elif args.full:
+        print(f"Starting comprehensive scan on {args.target}...")
+        if os.geteuid() != 0:
+            print("Full scan requires root privileges")
+            sys.exit(1)
+            
+        results = scanner.full_scan(args.target)
+        if results:
+            report_file = scanner.generate_report(results, "full")
+            print(f"Scan completed. Report saved to {report_file}")
+            
+    elif args.vuln:
+        print(f"Starting vulnerability assessment on {args.target}...")
+        results = scanner.vulnerability_scan(args.target)
+        if results:
+            report_file = scanner.generate_report(results, "vuln")
+            print(f"Assessment completed. Report saved to {report_file}")
 
 if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print(f"\n{colors.RED}[!] Scan interrupted{colors.RESET}")
-        sys.exit(1)
+        print("\nScan aborted by user")
+        sys.exit(0)
