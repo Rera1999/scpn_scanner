@@ -1,0 +1,23 @@
+settings:
+  max_threads: 4
+  default_timeout: 600
+
+tools:
+  nmap:
+    command: "nmap -sV -sC -T4 -p- {target}"
+    timeout: 600
+  nikto:
+    command: "nikto -host {target} -port 80,443 -nointeractive"
+    timeout: 300
+  dirb:
+    command: "dirb http://{target} /usr/share/dirb/wordlists/common.txt -N 403 -r"
+    timeout: 600
+  sqlmap:
+    command: "sqlmap -u 'http://{target}/vuln.php?id=1' --batch --risk=3 --level=5"
+    timeout: 900
+  sslyze:
+    command: "sslyze --regular {target}"
+    timeout: 300
+  whatweb:
+    command: "whatweb {target} --color=never"
+    timeout: 200
